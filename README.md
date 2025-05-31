@@ -1,108 +1,94 @@
 # ERC20Fork
+> [!NOTE]
+> Built at ETHGlobal Prague Hackathon 2025 🏆
 
-An ERC20 token implementation that supports lazy migration during token forks, with optional post-fork distribution controls.
+A modern implementation of token forking functionality, inspired by Jordi Baylina's MiniMe token. This library brings back the powerful forking capabilities that made MiniMe tokens so versatile, but with modern Solidity practices and ERC20 standards.
 
-## Features
+## The Story
 
-- **Dual Deployment Modes**:
-  - Direct deployment with initial supply (as a new ERC20 token)
-  - Fork deployment from an existing ERC20 token with ERC20Votes extension
+Token forking is a powerful mechanism that allows creating new tokens that inherit the state of an existing token at a specific point in time. 
 
-- **Lazy Migration**:
-  - Balances are read from parent token's historical snapshot at fork block using `getPastVotes`
-  - Balance migration happens lazily on first interaction (transfer, approve, etc.) via internal `migrate()` function
-  - Balances are immediately wallet-visible post-fork without requiring claim transactions
-  - Migration only affects internal accounting - UX remains seamless for users
+We've reimagined this functionality for modern ERC20 tokens, with a focus on:
+- Full ERC20Votes compatibility for governance
+- Gas-efficient lazy migration
+- Modern Solidity practices
 
-- **Voting Power Support**:
-  - Inherits from ERC20Votes for full governance functionality
-  - Maintains voting power from parent token through lazy migration
-  - Voting power is migrated along with balances during first interaction
-  - Supports complete ERC20Votes functionality including:
-    - Delegation of voting power
-    - Historical voting power queries
-    - Vote tracking across checkpoints
-    - Governance integration readiness
-  - Fork maintains full compatibility with governance protocols
-  - Seamless transition of voting rights from parent to forked token
+## Architecture
 
-- **Post-Fork Controls** (Optional):
-  - Owner can mint/burn tokens before enabling transfers
-  - Transfers must be frozen during distribution adjustment
-  - One-way unfreezing that renounces ownership
+The library consists of two contracts that work together:
+
+### ERC20Fork
+
+The core contract that implements the fork functionality. It can be used in two ways:
+1. As a new token with initial supply (not actually using the new functionality)
+2. As a fork of an existing ERC20 token with ERC20Votes extension
+
+Key features:
+- Lazy migration of balances from parent token
+- Historical balance resolution using ERC20Votes
+- Post-fork distribution controls
+- Transfer freezing capability
+
+### ERC20Forkable
+
+Extends `ERC20Fork` to add factory functionality. This means you can:
+1. Deploy a new token that can be forked later
+2. Create a fork that itself can be forked again
+
+This creates a chain of forkable tokens, each maintaining its own state while preserving the ability to create new forks.
 
 ## Usage
 
-### Direct Deployment
+### Deploying a New Forkable Token
 
 ```solidity
-// Deploy with initial supply
-ERC20Fork token = new ERC20Fork(
+// Deploy a new token that can be forked later
+ERC20Forkable token = new ERC20Forkable(
     "My Token",
     "MTK",
-    1000000 * 10**18,  // 1M tokens
-    initialHolder
+    1000000 * 10**18,  // Initial supply
+    msg.sender         // Initial holder
 );
 ```
 
-### Fork Deployment
+### Creating a Fork
 
 ```solidity
-// Deploy with 0 supply
-ERC20Fork token = new ERC20Fork(
+// Create a new fork of an existing token
+address newFork = token.fork(
     "Forked Token",
     "FTK",
-    0,
-    address(0)
+    msg.sender,    // Owner of the fork
+    true          // Freeze transfers initially
 );
 
-// Initialize fork
-token.initializeFork(
-    parentToken,    // Address of parent ERC20Votes token
-    forkBlock,      // Block number to fork from
-    owner,          // Address that will control post-fork distribution
-    true           // Whether to freeze transfers initially
+// The new fork can be forked again if it's an ERC20Forkable
+ERC20Forkable(newFork).fork(
+    "Second Fork",
+    "SFK",
+    msg.sender,
+    true
 );
-
-// Optional: Adjust distribution
-token.mintPostFork(newHolder, amount);
-token.burnPostFork(oldHolder, amount);
-
-// Enable transfers and renounce ownership
-token.enableTransfers();
 ```
 
-## Migration Flow
+### How It Works
 
-1. User's balance is automatically available through `balanceOf()`
-2. First transfer/approve triggers migration
-3. Parent token balance is migrated to forked contract
-4. User can now transfer tokens normally
+1. **Fork Creation**:
+   - New token is deployed with 0 initial supply
+   - Parent token and fork block are recorded
+   - Total supply is set to parent's supply at fork block
 
-## Post-Fork Controls
+2. **Balance Migration**:
+   - Balances are available immediately through `balanceOf()`
+   - First transfer/approve triggers actual migration
+   - Parent token balance is minted to user
+   - Account is marked as migrated
+   - This is a pure smart contract accounting migration, abstracted from UX
 
-When deployed as a fork with an owner:
-
-1. If owner decides to freeze transfers and make adjustments:
-2. Owner can:
-   - Mint new tokens (`mintPostFork`)
-   - Burn existing tokens (`burnPostFork`)
-   - Enable transfers (`enableTransfers`)
-3. Enabling transfers:
-   - Makes tokens transferable
-   - Renounces ownership
-   - Cannot be reversed
-
-## Security Considerations
-
-- Fork block must be in the past
-- Parent token must implement ERC20Votes
-- Migration is one-way and cannot be reversed
-- Post-fork distribution changes are locked after enabling transfers
-
-## License
-
-MIT
+3. **Post-Fork Controls**:
+   - Owner can adjust distribution before enabling transfers
+   - Can mint/burn tokens while transfers are frozen
+   - Enabling transfers is one-way and renounces ownership
 
 ## Development
 
@@ -135,6 +121,17 @@ forge build
 ```bash
 forge test
 ```
+
+## Security Considerations
+
+- Fork block must be in the past
+- Parent token must implement ERC20Votes
+- Post-fork distribution changes are locked after enabling transfers
+- Supply changes are tracked and emitted
+
+## License
+
+MIT
 
 ## Security
 
