@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/utils/Nonces.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Votes.sol";
+import "./interfaces/IERC20Votes.sol";
 
 /// @title ERC20Forkable
 /// @notice An ERC20 token that supports lazy migration during chain forks
@@ -22,6 +22,12 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
 
     /// @notice Mapping to track migrated accounts
     mapping(address => bool) public hasMigrated;
+
+    /// @notice Total supply of the parent token at fork block
+    uint256 private _forkTotalSupply;
+
+    /// @notice Changes to total supply after fork (can be negative)
+    int256 private _supplyDelta;
 
     /// @notice Event emitted when tokens are migrated
     event TokensMigrated(address indexed account, uint256 amount);
@@ -61,7 +67,21 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
 
         parentToken = _parentToken;
         forkBlock = _forkBlock;
+        
+        // Set total supply to parent token's supply at fork block
+        _forkTotalSupply = IERC20Votes(_parentToken).getPastTotalSupply(_forkBlock);
+        
         emit TokenForked(_parentToken, _forkBlock);
+    }
+
+    /// @notice Returns the total supply of tokens
+    /// @return The total supply of tokens
+    function totalSupply() public view override returns (uint256) {
+        if (parentToken != address(0)) {
+            // For forks: fork supply + any changes after fork
+            return uint256(int256(_forkTotalSupply) + _supplyDelta);
+        }
+        return super.totalSupply();
     }
 
     /// @notice Returns the balance of an account, including unmigrated balance from parent token at fork block
@@ -76,6 +96,36 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
         }
         
         return balance;
+    }
+
+    /// @notice Returns the voting power of an account, including unmigrated power from parent token
+    /// @param account The address to check the voting power of
+    /// @return The total voting power of the account
+    function getVotes(address account) public view override returns (uint256) {
+        uint256 votes = super.getVotes(account);
+        
+        // If this is a fork and the account hasn't migrated yet, add parent token voting power
+        if (parentToken != address(0) && !hasMigrated[account]) {
+            votes += IERC20Votes(parentToken).getVotes(account);
+        }
+        
+        return votes;
+    }
+
+    /// @notice Returns the voting power of an account at a specific block number
+    /// @param account The address to check the voting power of
+    /// @param blockNumber The block number to check the voting power at
+    /// @return The voting power of the account at the specified block
+    function getPastVotes(address account, uint256 blockNumber) public view override returns (uint256) {
+        uint256 votes = super.getPastVotes(account, blockNumber);
+        
+        // If this is a fork and the account hasn't migrated yet, add parent token voting power
+        // Only add parent voting power if the block is after the fork block
+        if (parentToken != address(0) && !hasMigrated[account] && blockNumber >= forkBlock) {
+            votes += IERC20Votes(parentToken).getPastVotes(account, blockNumber);
+        }
+        
+        return votes;
     }
 
     /// @notice Migrates balance from parent token to this token at fork block
@@ -96,6 +146,9 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
         
         if (parentBalance > 0) {
             _mint(account, parentBalance);
+            // Compensate for the mint by decreasing supply delta
+            // This ensures the total supply stays at _forkTotalSupply
+            _supplyDelta -= int256(parentBalance);
             emit TokensMigrated(account, parentBalance);
         }
     }
@@ -112,6 +165,17 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
             }
             if (to != address(0) && !hasMigrated[to]) {
                 _migrate(to);
+            }
+        }
+        
+        // Track supply changes for forks
+        if (parentToken != address(0)) {
+            if (from == address(0)) {
+                // Minting
+                _supplyDelta += int256(value);
+            } else if (to == address(0)) {
+                // Burning
+                _supplyDelta -= int256(value);
             }
         }
         
