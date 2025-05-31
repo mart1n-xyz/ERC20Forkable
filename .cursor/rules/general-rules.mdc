@@ -1,0 +1,29 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Forkable Token – Architecture and Stack Guidelines
+globs:
+  - @forkable-token/**/*.ts
+  - @forkable-token/**/*.sol
+alwaysApply: true
+---
+
+- Use Solidity ^0.8.20
+- Inherit from ERC20, ERC20Votes, and Ownable
+- Use ERC20Votes for all historical balance snapshots (no custom checkpointing)
+- Use EIP712-compliant constructors (`EIP712(name, "1")`) as required by ERC20Votes
+- Use only_owner access pattern for administrative functions (no controller or roles)
+- Do use factory patterns for fork creation (each token is a factory)
+- Avoid vote-based forking logic in v1 (use balance-based only, this would require using the governor)
+- Do use a smooth UX for automatic token distribution — first balanceOf() reads the balance of the original contract at fork block, then on first users interaction, balance is migrated via an internal _migrate() function
+- Emit events for fork creation and balance migration
+- All contract names must be PascalCase (e.g. ForkableToken)
+- All function names in Solidity must be camelCase
+- Use descriptive names: `createFork`, `claimForkTokens`, `migrate`, `hasMigrated`
+- Use custom errors for gas-efficient error handling (e.g. `error AlreadyMigrated();`)
+- Avoid state bloat: use mappings, not arrays, for fork tracking
+- Keep contracts self-contained and minimal to ensure hackathon deployability
+- Only deploy core primitive — all extensions (governance integrations, etc.) are future-phase and can be added ex post

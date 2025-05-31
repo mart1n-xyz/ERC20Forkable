@@ -1,0 +1,30 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Forkable Token – Lazy Migration Plan
+globs:
+  - @forkable-token/lazy_migration.ts
+alwaysApply: true
+---
+
+- Use our internal RPC pattern if services are exposed
+- Always use snake_case for service names
+- Avoid auto-minting at fork time
+- Implement lazy migration via read-once inheritance
+- Use ERC20Votes.getPastVotes for historical balance resolution
+- Store parent_token address and fork_block in each fork
+- Override balanceOf to return historical balance for non-migrated accounts
+- Trigger migrate() internally on first interaction (transfer, approve, etc.)
+- Mint inherited balance during migration and mark as migrated
+- Prevent double migration via has_migrated mapping
+- Emit fork_tokens_migrated event on successful migration
+- Do not require claim transactions
+- Ensure balances are wallet-visible immediately post-fork
+- Minimize gas usage by deferring state writes until interaction
+- Validate balance snapshot integrity using OpenZeppelin checkpoints
+- Consider UX for indexers and explorers (events help)
+- Ensure all migration logic is reentrancy-safe
+- Never access parent token balanceOf directly — use getPastVotes only
