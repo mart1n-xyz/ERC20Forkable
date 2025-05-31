@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@openzeppelin/contracts/utils/Nonces.sol";
 
 /// @title ERC20Forkable
 /// @notice An ERC20 token that supports lazy migration during chain forks
