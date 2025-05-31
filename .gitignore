@@ -9,6 +9,10 @@ broadcast/
 *.swp
 *.swo
 
+# Cursor
+.cursor/
+.cursor-rules/
+
 # Environment variables
 .env
 .env.*
