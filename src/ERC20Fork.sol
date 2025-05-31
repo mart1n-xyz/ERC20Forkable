@@ -45,22 +45,23 @@ contract ERC20Fork is ERC20, ERC20Votes, ERC20Permit, Ownable {
     /// @notice Event emitted when transfers are enabled
     event TransfersEnabled();
 
-    /// @notice Deploys a new ERC20Forkable token
+    /// @notice Deploys a new ERC20Fork token
     /// @param name The name of the token
     /// @param symbol The symbol of the token
     /// @param initialSupply The initial supply of tokens (0 for fork deployment)
     /// @param initialHolder The address that will receive the initial supply (address(0) for fork deployment)
+    /// @param owner The address that will be the owner of the contract
     constructor(
         string memory name,
         string memory symbol,
         uint256 initialSupply,
-        address initialHolder
-    ) ERC20(name, symbol) ERC20Votes() ERC20Permit(name) Ownable(address(0)) {
+        address initialHolder,
+        address owner
+    ) ERC20(name, symbol) ERC20Votes() ERC20Permit(name) Ownable(owner) {
         if (initialSupply > 0) {
             require(initialHolder != address(0), "Invalid initial holder");
             transfersEnabled = true;
             _mint(initialHolder, initialSupply);
-            
         }
     }
 

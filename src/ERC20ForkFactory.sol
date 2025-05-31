@@ -22,18 +22,21 @@ contract ERC20ForkFactory {
     /// @param symbol The symbol of the token
     /// @param initialSupply The initial supply of tokens (0 for fork deployment)
     /// @param initialHolder The address that will receive the initial supply (address(0) for fork deployment)
+    /// @param owner The address that will own the token
     /// @return The address of the newly created token
     function createToken(
         string memory name,
         string memory symbol,
         uint256 initialSupply,
-        address initialHolder
+        address initialHolder,
+        address owner
     ) external returns (address) {
         ERC20Fork newToken = new ERC20Fork(
             name,
             symbol,
             initialSupply,
-            initialHolder
+            initialHolder,
+            owner
         );
         return address(newToken);
     }
@@ -61,7 +64,8 @@ contract ERC20ForkFactory {
             name,
             symbol,
             0,  // No initial supply
-            address(0)  // No initial holder
+            address(0),  // No initial holder
+            owner
         );
 
         // Initialize the fork
