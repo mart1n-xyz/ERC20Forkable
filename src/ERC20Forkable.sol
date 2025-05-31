@@ -6,12 +6,13 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/utils/Nonces.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IERC20Votes.sol";
 
 /// @title ERC20Forkable
 /// @notice An ERC20 token that supports lazy migration during chain forks
 /// @dev Inherits from ERC20Votes to support historical balance resolution
-contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
+contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit, Ownable {
     /// @notice Address of the parent token contract
     /// @dev address(0) indicates this is a direct deployment, not a fork
     address public parentToken;
@@ -29,11 +30,20 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
     /// @notice Changes to total supply after fork (can be negative)
     int256 private _supplyDelta;
 
+    /// @notice Whether transfers are enabled
+    bool public transfersEnabled;
+
     /// @notice Event emitted when tokens are migrated
     event TokensMigrated(address indexed account, uint256 amount);
 
     /// @notice Event emitted when a token is forked
     event TokenForked(address indexed parentToken, uint256 forkBlock);
+
+    /// @notice Event emitted when supply changes after fork
+    event SupplyChanged(int256 delta, uint256 newTotalSupply);
+
+    /// @notice Event emitted when transfers are enabled
+    event TransfersEnabled();
 
     /// @notice Deploys a new ERC20Forkable token
     /// @param name The name of the token
@@ -45,23 +55,29 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
         string memory symbol,
         uint256 initialSupply,
         address initialHolder
-    ) ERC20(name, symbol) ERC20Votes() ERC20Permit(name) {
+    ) ERC20(name, symbol) ERC20Votes() ERC20Permit(name) Ownable(address(0)) {
         if (initialSupply > 0) {
             require(initialHolder != address(0), "Invalid initial holder");
             _mint(initialHolder, initialSupply);
+            transfersEnabled = true;
         }
     }
 
     /// @notice Initializes a fork of an existing token
     /// @param _parentToken The address of the parent token
     /// @param _forkBlock The block number at which the fork occurred
+    /// @param _owner The address that will own the forked token
+    /// @param _freezeTransfers Whether to freeze transfers initially
     /// @dev Can only be called once and only if this is a direct deployment
     function initializeFork(
         address _parentToken,
-        uint256 _forkBlock
+        uint256 _forkBlock,
+        address _owner,
+        bool _freezeTransfers
     ) external {
         require(_parentToken != address(0), "Invalid parent token");
         require(_forkBlock > 0, "Invalid fork block");
+        require(_owner != address(0), "Invalid owner");
         require(parentToken == address(0), "Already initialized");
         require(forkBlock == 0, "Already forked");
 
@@ -71,7 +87,42 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
         // Set total supply to parent token's supply at fork block
         _forkTotalSupply = IERC20Votes(_parentToken).getPastTotalSupply(_forkBlock);
         
+        // Set the specified address as the owner
+        _transferOwnership(_owner);
+        
+        // Set transfers state based on parameter
+        transfersEnabled = !_freezeTransfers;
+        
         emit TokenForked(_parentToken, _forkBlock);
+    }
+
+    /// @notice Mints tokens after fork, can only be called by owner when transfers are disabled
+    /// @param to The address to mint tokens to
+    /// @param amount The amount of tokens to mint
+    function mintPostFork(address to, uint256 amount) external onlyOwner {
+        require(!transfersEnabled, "Transfers must be disabled");
+        _mint(to, amount);
+        _supplyDelta += int256(amount);
+        emit SupplyChanged(int256(amount), totalSupply());
+    }
+
+    /// @notice Burns tokens after fork, can only be called by owner when transfers are disabled
+    /// @param from The address to burn tokens from
+    /// @param amount The amount of tokens to burn
+    function burnPostFork(address from, uint256 amount) external onlyOwner {
+        require(!transfersEnabled, "Transfers must be disabled");
+        _burn(from, amount);
+        _supplyDelta -= int256(amount);
+        emit SupplyChanged(-int256(amount), totalSupply());
+    }
+
+    /// @notice Enables transfers and renounces ownership
+    /// @dev Can only be called by owner when transfers are disabled
+    function enableTransfers() external onlyOwner {
+        require(!transfersEnabled, "Transfers already enabled");
+        transfersEnabled = true;
+        emit TransfersEnabled();
+        renounceOwnership();
     }
 
     /// @notice Returns the total supply of tokens
@@ -88,10 +139,14 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
     /// @param account The address to check the balance of
     /// @return The total balance of the account
     function balanceOf(address account) public view override returns (uint256) {
-        uint256 balance = super.balanceOf(account);
+        // For direct deployments, just return the balance
+        if (parentToken == address(0)) {
+            return super.balanceOf(account);
+        }
         
-        // If this is a fork and the account hasn't migrated yet, add parent token balance at fork block
-        if (parentToken != address(0) && !hasMigrated[account]) {
+        // For forks, include unmigrated parent token balance
+        uint256 balance = super.balanceOf(account);
+        if (!hasMigrated[account]) {
             balance += IERC20Votes(parentToken).getPastVotes(account, forkBlock);
         }
         
@@ -119,8 +174,10 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
     function getPastVotes(address account, uint256 blockNumber) public view override returns (uint256) {
         uint256 votes = super.getPastVotes(account, blockNumber);
         
-        // If this is a fork and the account hasn't migrated yet, add parent token voting power
-        // Only add parent voting power if the block is after the fork block
+        // For forks, handle voting power based on block number:
+        // - Before fork: Only parent token votes
+        // - At fork: Both parent and new token votes
+        // - After fork: Only new token votes (after migration)
         if (parentToken != address(0) && !hasMigrated[account] && blockNumber >= forkBlock) {
             votes += IERC20Votes(parentToken).getPastVotes(account, blockNumber);
         }
@@ -150,6 +207,7 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
             // This ensures the total supply stays at _forkTotalSupply
             _supplyDelta -= int256(parentBalance);
             emit TokensMigrated(account, parentBalance);
+            emit SupplyChanged(-int256(parentBalance), totalSupply());
         }
     }
 
@@ -158,6 +216,8 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
         internal
         override(ERC20, ERC20Votes)
     {
+        require(transfersEnabled || owner() == address(0), "Transfers disabled");
+        
         // If this is a fork, ensure accounts are migrated before transfer
         if (parentToken != address(0)) {
             if (!hasMigrated[from]) {
@@ -173,9 +233,11 @@ contract ERC20Forkable is ERC20, ERC20Votes, ERC20Permit {
             if (from == address(0)) {
                 // Minting
                 _supplyDelta += int256(value);
+                emit SupplyChanged(int256(value), totalSupply());
             } else if (to == address(0)) {
                 // Burning
                 _supplyDelta -= int256(value);
+                emit SupplyChanged(-int256(value), totalSupply());
             }
         }
         
