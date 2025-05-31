@@ -1,6 +1,36 @@
-# Compiler files
+# Foundry
 cache/
 out/
+broadcast/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.*
+
+# Node (if using hardhat or other node-based tools)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Coverage
+coverage/
+coverage.json
+
+# Gas reporter
+gas-report.txt
+
+# Debug
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
 
 # Ignores development broadcast logs
 !/broadcast
@@ -9,6 +39,3 @@ out/
 
 # Docs
 docs/
-
-# Dotenv file
-.env

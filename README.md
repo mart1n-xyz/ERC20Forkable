@@ -1,66 +1,52 @@
-## Foundry
+# ERC20Forkable
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+A forkable ERC20 token implementation that allows for lazy migration of token balances during chain forks.
 
-Foundry consists of:
+## Features
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- Lazy migration of token balances
+- Historical balance resolution using ERC20Votes
+- Gas-efficient implementation
+- Reentrancy-safe migration logic
+- No claim transactions required
+- Immediate wallet visibility post-fork
 
-## Documentation
+## Development
 
-https://book.getfoundry.sh/
+This project uses [Foundry](https://getfoundry.sh/) for development and testing.
 
-## Usage
+### Prerequisites
 
-### Build
+- [Foundry](https://getfoundry.sh/)
+- Git
 
-```shell
-$ forge build
+### Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/ERC20Forkable.git
+cd ERC20Forkable
 ```
 
-### Test
-
-```shell
-$ forge test
+2. Install dependencies:
+```bash
+forge install
 ```
 
-### Format
-
-```shell
-$ forge fmt
+3. Build the project:
+```bash
+forge build
 ```
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
+4. Run tests:
+```bash
+forge test
 ```
 
-### Anvil
+## License
 
-```shell
-$ anvil
-```
+MIT
 
-### Deploy
+## Security
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+This project is in development. Use at your own risk.
