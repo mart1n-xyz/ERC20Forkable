@@ -1,4 +1,4 @@
-# ERC20Fork(able)
+# ERC20Fork
 > [!NOTE]
 > Built at ETHGlobal Prague Hackathon 2025 🏆
 
@@ -29,18 +29,10 @@ Key features:
 - Post-fork distribution controls
 - Transfer freezing capability
 
-### ERC20Forkable
-
-Extends `ERC20Fork` to add factory functionality. This means you can:
-1. Deploy a new token that can be forked later
-2. Create a fork that itself can be forked again
-
-This creates a chain of forkable tokens, each maintaining its own state while preserving the ability to create new forks.
-
 ### ERC20ForkFactory
 
 A dedicated factory contract for deploying new tokens and forks. It provides:
-1. Creation of new `ERC20Forkable` tokens with initial supply (completely new token but forkable)
+1. Creation of new `ERC20Fork` tokens with initial supply (completely new token but forkable)
 2. Creation of forks from any existing ERC20 tokens with ERC20Votes extension
 3. Validation of parent tokens before forking
 4. Detailed event emission for tracking
@@ -68,38 +60,6 @@ address newFork = factory.createFork(
     "FTK",
     msg.sender,      // Owner of the fork
     true            // Freeze transfers initially
-);
-```
-
-### Deploying a New Forkable Token
-
-```solidity
-// Deploy a new token that can be forked later
-ERC20Forkable token = new ERC20Forkable(
-    "My Token",
-    "MTK",
-    1000000 * 10**18,  // Initial supply
-    msg.sender         // Initial holder
-);
-```
-
-### Creating a Fork
-
-```solidity
-// Create a new fork of an existing token
-address newFork = token.fork(
-    "Forked Token",
-    "FTK",
-    msg.sender,    // Owner of the fork
-    true          // Freeze transfers initially
-);
-
-// The new fork can be forked again if it's an ERC20Forkable
-ERC20Forkable(newFork).fork(
-    "Second Fork",
-    "SFK",
-    msg.sender,
-    true
 );
 ```
 

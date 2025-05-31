@@ -58,8 +58,9 @@ contract ERC20Fork is ERC20, ERC20Votes, ERC20Permit, Ownable {
     ) ERC20(name, symbol) ERC20Votes() ERC20Permit(name) Ownable(address(0)) {
         if (initialSupply > 0) {
             require(initialHolder != address(0), "Invalid initial holder");
-            _mint(initialHolder, initialSupply);
             transfersEnabled = true;
+            _mint(initialHolder, initialSupply);
+            
         }
     }
 
