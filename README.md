@@ -1,8 +1,8 @@
-# ERC20Fork
+# ERC20Fork(able)
 > [!NOTE]
 > Built at ETHGlobal Prague Hackathon 2025 🏆
 
-A modern implementation of token forking functionality, inspired by Jordi Baylina's MiniMe token. This library brings back the powerful forking capabilities that made MiniMe tokens so versatile, but with modern Solidity practices and ERC20 standards.
+A modern implementation of token forking functionality, inspired by Jordi Baylina's MiniMe token. This library brings back the powerful forking capabilities of MiniMe tokens, but with modern Solidity practices, optimizations, and ERC20 standards.
 
 ## The Story
 
@@ -15,7 +15,7 @@ We've reimagined this functionality for modern ERC20 tokens, with a focus on:
 
 ## Architecture
 
-The library consists of two contracts that work together:
+The library consists of three contracts that build on each other:
 
 ### ERC20Fork
 
@@ -37,7 +37,39 @@ Extends `ERC20Fork` to add factory functionality. This means you can:
 
 This creates a chain of forkable tokens, each maintaining its own state while preserving the ability to create new forks.
 
+### ERC20ForkFactory
+
+A dedicated factory contract for deploying new tokens and forks. It provides:
+1. Creation of new `ERC20Forkable` tokens with initial supply (completely new token but forkable)
+2. Creation of forks from any existing ERC20 tokens with ERC20Votes extension
+3. Validation of parent tokens before forking
+4. Detailed event emission for tracking
+
 ## Usage
+
+### Using the Factory
+
+```solidity
+// Deploy the factory
+ERC20ForkFactory factory = new ERC20ForkFactory();
+
+// Create a new token that can be forked later
+address newToken = factory.createToken(
+    "My Token",
+    "MTK",
+    1000000 * 10**18,  // Initial supply
+    msg.sender         // Initial holder
+);
+
+// Create a fork of any ERC20Votes token
+address newFork = factory.createFork(
+    existingToken,    // Address of any ERC20Votes token
+    "Forked Token",
+    "FTK",
+    msg.sender,      // Owner of the fork
+    true            // Freeze transfers initially
+);
+```
 
 ### Deploying a New Forkable Token
 
